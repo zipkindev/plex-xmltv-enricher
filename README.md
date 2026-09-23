@@ -1,5 +1,8 @@
 # plex-xmltv-enricher
 
+[![CI](https://github.com/zipkindev/plex-xmltv-enricher/actions/workflows/ci.yml/badge.svg)](https://github.com/zipkindev/plex-xmltv-enricher/actions/workflows/ci.yml)
+[![License: 0BSD](https://img.shields.io/badge/License-0BSD-blue.svg)](LICENSE)
+
 `plex-xmltv-enricher` is a small, conservative XMLTV proxy for Plex DVR. It
 preserves an existing guide and adds standard episode identity only when the
 source or a configured metadata provider supplies enough evidence.
@@ -272,4 +275,10 @@ feeds or metadata services.
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+[0BSD](LICENSE). You may use, copy, modify, and distribute this software for
+any purpose, with or without a fee and without an attribution condition.
+
+This license covers the repository's source code. It does not grant rights to
+Plex trademarks or to metadata, artwork, or other content returned by TMDB,
+TheTVDB, TVmaze, XMLTV providers, or upstream guide services. Users remain
+responsible for those services' terms and attribution requirements.
