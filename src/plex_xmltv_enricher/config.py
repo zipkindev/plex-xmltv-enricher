@@ -5,6 +5,8 @@ from pathlib import Path
 import tomllib
 from urllib.parse import urlsplit
 
+from .matching import normalize
+
 
 class ConfigError(ValueError):
     pass
@@ -174,7 +176,7 @@ def load_config(path: Path) -> Config:
             str(x).casefold() for x in enrichment.get("series_categories", [])
         ),
         series_titles=frozenset(
-            str(x).casefold() for x in enrichment.get("series_titles", [])
+            normalize(str(x)) for x in enrichment.get("series_titles", [])
         ),
         movie_categories=frozenset(
             str(x).casefold() for x in enrichment.get("movie_categories", [])

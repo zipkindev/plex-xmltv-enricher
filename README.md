@@ -28,14 +28,14 @@ interpret. For example:
 ```
 
 `E121` may mean episode 121 of a year-season, an absolute episode number, or
-something provider-specific. It must not be interpreted as `S01E21`, and the
-year must not be treated as a season for every series. Version 0.2 stores a
-numbering model per resolved series and corroborates the episode against a
-catalog before emitting zero-based XMLTV numbering:
+something provider-specific. It must not be interpreted as `S01E21`. The
+resolver first tries a canonical provider episode. If that is unavailable, a
+configured series can retain the conservative version 0.1 identity fallback so
+Plex still treats it as episodic without claiming a canonical provider match.
 
 ```xml
-<episode-num system="xmltv_ns">2025.120.</episode-num>
-<episode-num system="thetvdb.com">episode/1234567</episode-num>
+<episode-num system="xmltv_ns">21.140.</episode-num>
+<episode-num system="themoviedb.org">episode/1234567</episode-num>
 <category lang="en">Series</category>
 ```
 
@@ -46,14 +46,16 @@ Programs are handled in this order:
 1. Existing `xmltv_ns` and source `original-air-date` identifiers are preserved.
 2. Explicit `S03E08`, `S3 E8`, and `S3 E8/12` values are normalized to
    `2.7.` without a network lookup.
-3. Explicitly configured version 0.1 compatibility rules remain available while
-   deployments migrate to provider-backed resolution.
-4. The resolver maps a show to a stable provider ID using normalized title,
+3. The resolver maps a show to a stable provider ID using normalized title,
    aliases, country, language and network.
-5. An episode is selected using catalog numbering, exact unique subtitle,
+4. An episode is selected using catalog numbering, exact unique subtitle,
    exact unique airdate, or a configured `year`/`absolute` numbering model.
-6. Minimum confidence and runner-up margin gates must both pass. Ties and weak
-   matches remain unchanged.
+5. Minimum confidence and runner-up margin gates must both pass.
+6. After a provider miss, an explicit bare episode plus production year is
+   normalized using the legacy year-season convention. If only a subtitle is
+   available, SQLite assigns that normalized title/subtitle pair one stable
+   `original-air-date` identity across reruns. The `identity_fallback` counter
+   exposes these non-canonical results separately from `provider_resolved`.
 
 The runtime is deterministic and does not use an LLM.
 
@@ -79,7 +81,8 @@ Every XMLTV refresh discovers new show fingerprints. Known mappings and episode
 catalogs are reused immediately from SQLite. Unknown titles are searched only
 after the configured cache TTL, including negative-cache entries. Episode
 catalogs use stale data if a refresh fails, while invalid source XML never
-replaces the last-known-good guide.
+replaces the last-known-good guide. Provider requests retry rate limits and
+transient server/network failures with bounded backoff.
 
 SQLite records:
 
@@ -136,9 +139,9 @@ hard-code individual episodes:
 
 ```toml
 [series_overrides."Das perfekte Dinner"]
-provider = "thetvdb"
-series_id = "266543"
-numbering = "year"
+provider = "tmdb"
+series_id = "127163"
+numbering = "catalog"
 ```
 
 Supported numbering models are:
@@ -242,6 +245,8 @@ feeds or metadata services.
   corrected TMDB locale handling for safe shadow operation.
 - `0.2.2`: exposes the current refresh's provider-series lookup count separately
   from cumulative cache statistics for durable budget monitoring.
+- `0.3.0`: canonical-first resolution with a measured stable-identity fallback,
+  punctuation-normalized configured titles, and bounded provider retry/backoff.
 
 ## License
 

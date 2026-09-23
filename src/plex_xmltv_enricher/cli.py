@@ -36,6 +36,7 @@ def main() -> None:
             "unresolved": result.unresolved,
             "non_episodic": result.non_episodic,
             "series_lookups": result.series_lookups,
+            "identity_fallback": result.identity_fallback,
             "topology_hash": result.topology_hash,
         }
         if args.command == "audit":

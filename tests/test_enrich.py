@@ -16,7 +16,7 @@ def config(tmp_path: Path) -> Config:
         timeout_seconds=10, max_bytes=1024 * 1024, refresh_seconds=60,
         listen_host="127.0.0.1", port=9193, state_dir=tmp_path,
         series_categories=frozenset({"kochdokusoap", "serie"}),
-        series_titles=frozenset({"first dates - ein tisch für zwei"}),
+        series_titles=frozenset({"first dates ein tisch für zwei"}),
         movie_categories=frozenset({"spielfilm", "movie"}), test_tuner_enabled=False,
     )
 
@@ -65,15 +65,16 @@ def test_sxx_exx_with_total_is_normalized_without_category_guess(tmp_path: Path)
     assert node.find("episode-num[@system='xmltv_ns']").text == "9.6."  # type: ignore[union-attr]
 
 
-def test_subtitle_without_episode_evidence_is_left_unchanged(tmp_path: Path) -> None:
+def test_subtitle_without_episode_evidence_uses_stable_identity(tmp_path: Path) -> None:
     first = feed(programme(""))
     second = feed(programme("").replace("20260923170000", "20260924170000"))
     store = Store(tmp_path)
     one = enrich(first, config(tmp_path), store)
     two = enrich(second, config(tmp_path), store)
-    assert parsed(one.xml).find("episode-num") is None
-    assert parsed(two.xml).find("episode-num") is None
-    assert one.unresolved == 1 and two.unresolved == 1
+    first_num = parsed(one.xml).find("episode-num[@system='original-air-date']")
+    second_num = parsed(two.xml).find("episode-num[@system='original-air-date']")
+    assert first_num is not None and second_num is not None and first_num.text == second_num.text
+    assert one.identity_fallback == 1 and two.identity_fallback == 1
 
 
 def test_movie_category_refuses_enrichment(tmp_path: Path) -> None:
@@ -169,6 +170,35 @@ def test_unknown_classification_does_not_call_provider(tmp_path: Path) -> None:
     assert resolver.calls == 0
     assert result.unresolved == 1
     assert result.series_lookups == 0
+
+
+def test_configured_series_uses_stable_identity_after_provider_miss(tmp_path: Path) -> None:
+    class StubResolver:
+        series_lookups = 1
+
+        def begin_refresh(self) -> None:
+            pass
+
+        def resolve(self, facts: object) -> Resolution:
+            return Resolution("unresolved", "episode_below_confidence")
+
+    cfg = replace(config(tmp_path), resolver_enabled=True)
+    source = feed(
+        programme(
+            "",
+            title="First Dates – Ein Tisch für zwei",
+            subtitle="U. a. mit: Steffi und Frank",
+        )
+    )
+    store = Store(tmp_path)
+    first = enrich(source, cfg, store, StubResolver())  # type: ignore[arg-type]
+    second_source = source.replace(b"20260923160000", b"20260924160000")
+    second = enrich(second_source, cfg, store, StubResolver())  # type: ignore[arg-type]
+    first_node = ET.fromstring(first.xml).find("programme/episode-num")
+    second_node = ET.fromstring(second.xml).find("programme/episode-num")
+    assert first.identity_fallback == 1
+    assert first_node is not None and first_node.get("system") == "original-air-date"
+    assert second_node is not None and second_node.text == first_node.text
 
 
 @pytest.mark.parametrize("source", [b"", b"<tv>", b"<not-tv />", b"<tv><channel /></tv>"])

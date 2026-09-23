@@ -52,9 +52,9 @@ enabled = true
 # numbering model controls how a source value such as E121 may be compared to
 # provider episodes: catalog, year, or absolute.
 [series_overrides."Das perfekte Dinner"]
-provider = "thetvdb"
-series_id = "266543"
-numbering = "year"
+provider = "tmdb"
+series_id = "127163"
+numbering = "catalog"
 
 [test_tuner]
 enabled = false

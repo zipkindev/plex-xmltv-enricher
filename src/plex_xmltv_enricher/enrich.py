@@ -32,6 +32,7 @@ class Result:
     unresolved: int = 0
     non_episodic: int = 0
     series_lookups: int = 0
+    identity_fallback: int = 0
 
 
 def channel_topology(root: ET.Element) -> tuple[tuple[str, tuple[str, ...]], ...]:
@@ -85,6 +86,13 @@ def _airing_date(programme: ET.Element) -> str:
     return datetime.strptime(match.group(1), "%Y%m%d").strftime("%Y-%m-%d")
 
 
+def _airing_datetime(programme: ET.Element) -> str:
+    match = re.match(r"^(\d{14})", programme.get("start", ""))
+    if not match:
+        raise FeedError("programme lacks a valid start time")
+    return datetime.strptime(match.group(1), "%Y%m%d%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+
+
 def _categories(programme: ET.Element) -> set[str]:
     return {
         (node.text or "").strip().casefold()
@@ -100,7 +108,7 @@ def _contains(categories: set[str], words: tuple[str, ...]) -> bool:
 
 def _classification(programme: ET.Element, config: Config) -> str:
     categories = _categories(programme)
-    title = _text(programme, "title").casefold()
+    title = normalize(_text(programme, "title"))
     if categories & config.movie_categories or _contains(
         categories, ("movie", "spielfilm", "kinofilm", "feature film")
     ):
@@ -202,6 +210,7 @@ def enrich(
     programmes = root.findall("programme")
     enriched = preserved = refused_movies = 0
     source_normalized = provider_resolved = ambiguous = unresolved = non_episodic = 0
+    identity_fallback = 0
     if resolver is not None:
         resolver.begin_refresh()
     for programme in programmes:
@@ -238,6 +247,7 @@ def enrich(
                 enriched += 1
                 source_normalized += 1
                 continue
+        provider_status = ""
         if (
             classification == "configured-series"
             and resolver is not None
@@ -249,11 +259,7 @@ def enrich(
                 enriched += 1
                 provider_resolved += 1
                 continue
-            if resolution.status == "ambiguous":
-                ambiguous += 1
-            else:
-                unresolved += 1
-            continue
+            provider_status = resolution.status
         bare = re.fullmatch(r"E(\d{1,6})", onscreen, re.IGNORECASE)
         year = _text(programme, "date")
         if classification == "configured-series" and bare and re.fullmatch(r"(?:19|20)\d{2}", year):
@@ -269,7 +275,20 @@ def enrich(
                 enriched += 1
                 source_normalized += 1
                 continue
-        unresolved += 1
+        if classification == "configured-series" and _text(programme, "sub-title"):
+            identity = normalize(_text(programme, "title")) + "\x1f" + normalize(
+                _text(programme, "sub-title")
+            )
+            stable = store.stable_date(identity, _airing_datetime(programme))
+            _append(programme, "episode-num", stable, system="original-air-date")
+            _add_series_category(programme)
+            enriched += 1
+            identity_fallback += 1
+            continue
+        if provider_status == "ambiguous":
+            ambiguous += 1
+        else:
+            unresolved += 1
     xml = ET.tostring(root, encoding="utf-8", xml_declaration=True)
     reparsed = ET.fromstring(xml)
     if channel_topology(reparsed) != topology or len(reparsed.findall("programme")) != len(programmes):
@@ -288,4 +307,5 @@ def enrich(
         unresolved=unresolved,
         non_episodic=non_episodic,
         series_lookups=0 if resolver is None else resolver.series_lookups,
+        identity_fallback=identity_fallback,
     )

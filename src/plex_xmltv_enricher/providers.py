@@ -3,7 +3,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import json
 import os
+import time
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -45,7 +47,7 @@ class JsonProvider(MetadataProvider):
         query = "" if not params else "?" + urlencode(params)
         request_headers = {
             "Accept": "application/json",
-            "User-Agent": "plex-xmltv-enricher/0.2.2",
+            "User-Agent": "plex-xmltv-enricher/0.3.0",
             **(headers or {}),
         }
         data = None
@@ -58,11 +60,28 @@ class JsonProvider(MetadataProvider):
             method=method,
             data=data,
         )
-        try:
-            with urlopen(request, timeout=self.timeout) as response:
-                raw = response.read(16 * 1024 * 1024 + 1)
-        except Exception as exc:
-            raise ProviderError(f"{self.name} request failed") from exc
+        raw = b""
+        for attempt in range(3):
+            try:
+                with urlopen(request, timeout=self.timeout) as response:
+                    raw = response.read(16 * 1024 * 1024 + 1)
+                break
+            except HTTPError as exc:
+                if exc.code != 429 and not 500 <= exc.code < 600:
+                    raise ProviderError(f"{self.name} request failed") from exc
+                if attempt == 2:
+                    raise ProviderError(f"{self.name} request failed after retries") from exc
+                retry_after = exc.headers.get("Retry-After", "")
+                delay = (
+                    float(retry_after)
+                    if retry_after.replace(".", "", 1).isdigit()
+                    else 0.25 * (2 ** attempt)
+                )
+                time.sleep(min(max(delay, 0.0), 5.0))
+            except (URLError, TimeoutError) as exc:
+                if attempt == 2:
+                    raise ProviderError(f"{self.name} request failed after retries") from exc
+                time.sleep(0.25 * (2 ** attempt))
         if len(raw) > 16 * 1024 * 1024:
             raise ProviderError(f"{self.name} response exceeded limit")
         try:
