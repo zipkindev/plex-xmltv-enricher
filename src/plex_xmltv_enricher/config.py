@@ -48,6 +48,7 @@ class Config:
     ambiguity_margin: float = 0.08
     catalog_ttl_hours: int = 168
     negative_ttl_hours: int = 24
+    max_series_lookups_per_refresh: int = 10
     providers: tuple[ProviderConfig, ...] = ()
     series_overrides: tuple[tuple[str, SeriesOverride], ...] = ()
 
@@ -141,6 +142,7 @@ def load_config(path: Path) -> Config:
     state_dir = Path(str(storage.get("state_dir", "/state"))).resolve()
     catalog_ttl = int(resolver.get("catalog_ttl_hours", 168))
     negative_ttl = int(resolver.get("negative_ttl_hours", 24))
+    max_lookups = int(resolver.get("max_series_lookups_per_refresh", 10))
     if not 1 <= timeout <= 120:
         raise ConfigError("timeout_seconds must be between 1 and 120")
     if not 1024 <= max_bytes <= 256 * 1024 * 1024:
@@ -151,6 +153,8 @@ def load_config(path: Path) -> Config:
         raise ConfigError("port is invalid")
     if not 1 <= negative_ttl <= catalog_ttl <= 24 * 365:
         raise ConfigError("resolver cache TTL values are invalid")
+    if not 1 <= max_lookups <= 1000:
+        raise ConfigError("max_series_lookups_per_refresh is outside the safe range")
     if primary == fallback:
         raise ConfigError("primary and fallback URLs must differ")
     language = str(resolver.get("language", "de")).strip().casefold()
@@ -194,6 +198,7 @@ def load_config(path: Path) -> Config:
         ),
         catalog_ttl_hours=catalog_ttl,
         negative_ttl_hours=negative_ttl,
+        max_series_lookups_per_refresh=max_lookups,
         providers=_provider_configs(data),
         series_overrides=_series_overrides(data),
     )

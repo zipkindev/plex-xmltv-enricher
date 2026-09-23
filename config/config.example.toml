@@ -32,6 +32,7 @@ minimum_episode_confidence = 0.95
 ambiguity_margin = 0.08
 catalog_ttl_hours = 168
 negative_ttl_hours = 24
+max_series_lookups_per_refresh = 10
 
 # Credentials are read from these environment variables at runtime. Never put
 # API keys or subscriber PINs in this file.

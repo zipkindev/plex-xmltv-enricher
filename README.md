@@ -92,6 +92,10 @@ No manual action is needed when an unambiguous new episode appears. A genuinely
 new or ambiguous show remains visible in the guide without fabricated episode
 metadata and appears in the audit report.
 
+Only records explicitly identified as episodic by configured source categories
+or titles are sent to providers. Cold-cache discovery is also capped per
+refresh, so a large guide cannot create an unbounded provider request burst.
+
 ## Configuration
 
 Copy the complete example:
@@ -112,6 +116,7 @@ minimum_episode_confidence = 0.95
 ambiguity_margin = 0.08
 catalog_ttl_hours = 168
 negative_ttl_hours = 24
+max_series_lookups_per_refresh = 10
 
 [providers.thetvdb]
 enabled = true
@@ -233,6 +238,8 @@ feeds or metadata services.
 - `0.2.0`: provider-backed identity, persistent catalogs, confidence gates,
   ambiguity refusal and audit reporting. It must be shadow-tested before
   replacing an existing production guide.
+- `0.2.1`: episodic-only provider dispatch, bounded cold-cache discovery and
+  corrected TMDB locale handling for safe shadow operation.
 
 ## License
 

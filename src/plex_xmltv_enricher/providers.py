@@ -45,7 +45,7 @@ class JsonProvider(MetadataProvider):
         query = "" if not params else "?" + urlencode(params)
         request_headers = {
             "Accept": "application/json",
-            "User-Agent": "plex-xmltv-enricher/0.2",
+            "User-Agent": "plex-xmltv-enricher/0.2.1",
             **(headers or {}),
         }
         data = None
@@ -115,6 +115,13 @@ class TvMazeProvider(JsonProvider):
 class TmdbProvider(JsonProvider):
     name = "tmdb"
 
+    @staticmethod
+    def _locale(language: str, country: str | None = None) -> str:
+        if "-" in language:
+            return language
+        region = country or {"de": "DE", "en": "US"}.get(language, language.upper())
+        return f"{language}-{region}"
+
     def _headers(self) -> dict[str, str]:
         if not self.config.api_key_env:
             raise ProviderError("tmdb api_key_env is not configured")
@@ -126,7 +133,7 @@ class TmdbProvider(JsonProvider):
     def search_series(self, title: str, language: str, country: str) -> list[SeriesCandidate]:
         data = self._json(
             "/search/tv",
-            params={"query": title, "language": f"{language}-{country}"},
+            params={"query": title, "language": self._locale(language, country)},
             headers=self._headers(),
         )
         rows = data.get("results", []) if isinstance(data, dict) else []
@@ -147,7 +154,7 @@ class TmdbProvider(JsonProvider):
     def episodes(self, series_id: str, language: str) -> list[EpisodeCandidate]:
         headers = self._headers()
         details = self._json(
-            f"/tv/{series_id}", params={"language": language}, headers=headers
+            f"/tv/{series_id}", params={"language": self._locale(language)}, headers=headers
         )
         result: list[EpisodeCandidate] = []
         for season in details.get("seasons", []) if isinstance(details, dict) else []:
@@ -156,7 +163,7 @@ class TmdbProvider(JsonProvider):
                 continue
             page = self._json(
                 f"/tv/{series_id}/season/{season_number}",
-                params={"language": language},
+                params={"language": self._locale(language)},
                 headers=headers,
             )
             for row in page.get("episodes", []) if isinstance(page, dict) else []:

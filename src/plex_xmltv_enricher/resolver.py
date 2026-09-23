@@ -27,11 +27,20 @@ class Resolver:
         }
         self._mapping_memory: dict[str, dict[str, object] | None] = {}
         self._catalog_memory: dict[tuple[str, str, str], list[EpisodeCandidate]] = {}
+        self._series_lookups = 0
+
+    def begin_refresh(self) -> None:
+        self._series_lookups = 0
 
     def resolve(self, facts: ProgrammeFacts) -> Resolution:
         fingerprint = _fingerprint(facts)
         title_key = normalize(facts.title) + "\x1f" + (facts.country or self.config.resolver_country)
-        mapping = self._series_mapping(title_key, facts)
+        try:
+            mapping = self._series_mapping(title_key, facts)
+        except LookupBudgetExceeded:
+            result = Resolution("unresolved", "series_lookup_budget_exhausted")
+            self._record(fingerprint, result)
+            return result
         if mapping is None:
             result = Resolution("unresolved", "series_not_resolved")
             self._record(fingerprint, result)
@@ -71,6 +80,14 @@ class Resolver:
         if stored is not None:
             self._mapping_memory[title_key] = stored
             return stored
+        cached = self.store.series_search(title_key)
+        if cached is None or not _fresh(
+            cached[1],
+            self.config.negative_ttl_hours if not cached[0] else self.config.catalog_ttl_hours,
+        ):
+            if self._series_lookups >= self.config.max_series_lookups_per_refresh:
+                raise LookupBudgetExceeded
+            self._series_lookups += 1
         candidates = self._series_candidates(title_key, facts)
         ranked = sorted(
             ((_series_score(facts, candidate, self.config), candidate) for candidate in candidates),
@@ -78,11 +95,9 @@ class Resolver:
             reverse=True,
         )
         if not ranked or ranked[0][0] < self.config.minimum_series_confidence:
-            self._mapping_memory[title_key] = None
             return None
         runner_up = ranked[1][0] if len(ranked) > 1 else 0.0
         if ranked[0][0] - runner_up < self.config.ambiguity_margin:
-            self._mapping_memory[title_key] = None
             return None
         confidence, candidate = ranked[0]
         self.store.save_series_mapping(
@@ -326,3 +341,7 @@ def _fresh(timestamp: datetime, hours: int) -> bool:
     if timestamp.tzinfo is None:
         timestamp = timestamp.replace(tzinfo=timezone.utc)
     return datetime.now(timezone.utc) - timestamp <= timedelta(hours=hours)
+
+
+class LookupBudgetExceeded(RuntimeError):
+    pass

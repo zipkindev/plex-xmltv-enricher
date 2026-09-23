@@ -201,6 +201,8 @@ def enrich(
     programmes = root.findall("programme")
     enriched = preserved = refused_movies = 0
     source_normalized = provider_resolved = ambiguous = unresolved = non_episodic = 0
+    if resolver is not None:
+        resolver.begin_refresh()
     for programme in programmes:
         if not programme.get("channel") or not _text(programme, "title"):
             raise FeedError("programme lacks channel or title")
@@ -235,7 +237,11 @@ def enrich(
                 enriched += 1
                 source_normalized += 1
                 continue
-        if resolver is not None and config.resolver_enabled:
+        if (
+            classification == "configured-series"
+            and resolver is not None
+            and config.resolver_enabled
+        ):
             resolution = resolver.resolve(_facts(programme, channel_names, systems))
             if resolution.status == "resolved":
                 _add_provider_resolution(programme, resolution)

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 from plex_xmltv_enricher.config import Config, SeriesOverride
@@ -137,6 +138,23 @@ def test_no_series_match_stays_unresolved(tmp_path: Path) -> None:
     result = Resolver(cfg(tmp_path), Store(tmp_path), [Empty()]).resolve(facts())
     assert result.status == "unresolved"
     assert result.reason == "series_not_resolved"
+
+
+def test_series_lookup_budget_resets_each_refresh(tmp_path: Path) -> None:
+    provider = FakeProvider()
+    config = replace(cfg(tmp_path), max_series_lookups_per_refresh=1)
+    resolver = Resolver(config, Store(tmp_path), [provider])
+    first = facts("Unknown", "")
+    second = ProgrammeFacts(
+        "Another Show", "Unknown", "DE - VOX", "de", "DE", ("serie",),
+        2026, "2026-09-23", "",
+    )
+    resolver.begin_refresh()
+    resolver.resolve(first)
+    blocked = resolver.resolve(second)
+    assert blocked.reason == "series_lookup_budget_exhausted"
+    resolver.begin_refresh()
+    assert resolver.resolve(second).reason != "series_lookup_budget_exhausted"
 
 
 def test_series_cache_is_scoped_by_country(tmp_path: Path) -> None:

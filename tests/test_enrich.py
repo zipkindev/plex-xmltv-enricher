@@ -116,6 +116,9 @@ def test_inserted_elements_follow_xmltv_dtd_order(tmp_path: Path) -> None:
 
 def test_provider_resolution_is_append_only(tmp_path: Path) -> None:
     class StubResolver:
+        def begin_refresh(self) -> None:
+            pass
+
         def resolve(self, facts: object) -> Resolution:
             return Resolution(
                 "resolved",
@@ -139,6 +142,29 @@ def test_provider_resolution_is_append_only(tmp_path: Path) -> None:
     assert ("xmltv_ns", "10.10.") in values
     assert ("tvmaze.com", "episode/3705532") in values
     assert node.findtext("sub-title") == "Das Wiedersehen"
+
+
+def test_unknown_classification_does_not_call_provider(tmp_path: Path) -> None:
+    class StubResolver:
+        calls = 0
+
+        def begin_refresh(self) -> None:
+            pass
+
+        def resolve(self, facts: object) -> Resolution:
+            self.calls += 1
+            raise AssertionError("unclassified programme reached provider resolver")
+
+    source = feed(
+        programme("", title="Unclassified Programme").replace(
+            "<category>Kochdokusoap</category>", ""
+        )
+    )
+    cfg = replace(config(tmp_path), resolver_enabled=True)
+    resolver = StubResolver()
+    result = enrich(source, cfg, Store(tmp_path), resolver)  # type: ignore[arg-type]
+    assert resolver.calls == 0
+    assert result.unresolved == 1
 
 
 @pytest.mark.parametrize("source", [b"", b"<tv>", b"<not-tv />", b"<tv><channel /></tv>"])
