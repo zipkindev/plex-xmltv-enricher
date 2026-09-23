@@ -8,5 +8,6 @@ __pycache__/
 config/config.toml
 config/config.validation.toml
 state/
+build/
 dist/
 *.egg-info/
