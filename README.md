@@ -218,6 +218,28 @@ Plex parser tests.
 - The container runs as UID/GID `65532`, with a read-only root filesystem,
   dropped capabilities and `no-new-privileges`.
 
+## Production evidence
+
+Version 0.3.0 was promoted through an isolated shadow and guarded in-place Plex
+DVR deployment on 2026-09-23. The live seven-day snapshot retained all 160
+ordered channels and all 12,253 source programmes with zero changes to protected
+title, subtitle, description, date, icon, or rating fields.
+
+- 413 programmes across 89 titles gained episodic identity;
+- 11 were canonical TMDB episode matches, 179 used explicit source/year
+  numbering, and 223 used the stable identity fallback;
+- Plex imported current `Das perfekte Dinner` broadcasts as canonical
+  `S22E141`–`S22E143`;
+- Plex imported all current `First Dates – Ein Tisch für zwei` broadcasts as
+  episodes with show relationships;
+- both independent source feeds retained identical 160-channel topology.
+
+TMDB catalog coverage is incomplete for some high-volume German daily and
+reality shows. The fallback keeps those entries episodic but deliberately does
+not claim canonical provider season/episode metadata. Another licensed catalog
+can be enabled later for greater canonical coverage without changing the XMLTV
+topology or Plex tuner mappings.
+
 ## Development
 
 Python 3.13 is required.
