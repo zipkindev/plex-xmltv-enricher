@@ -1,0 +1,27 @@
+[source]
+primary_url = "http://dispatcharr-one.example:9191/output/epg/Plex-Regional-1?cachedlogos=false"
+fallback_url = "http://dispatcharr-two.example:9192/output/epg/Plex-Regional-2?cachedlogos=false"
+timeout_seconds = 30
+max_bytes = 33554432
+refresh_seconds = 900
+
+[server]
+listen_host = "0.0.0.0"
+port = 9193
+
+[storage]
+state_dir = "/state"
+
+[enrichment]
+series_categories = [
+  "Series", "Serie", "Kochdokusoap", "Dokusoap", "Doku-Soap",
+  "Comedyserie", "Krimiserie", "Soap", "Telenovela"
+]
+series_titles = [
+  "Das perfekte Dinner", "First Dates - Ein Tisch für zwei",
+  "Das Sommerhaus der Stars - Kampf der Promipaare"
+]
+movie_categories = ["Film", "Spielfilm", "Movie", "Kinofilm", "Kurzfilm"]
+
+[test_tuner]
+enabled = false

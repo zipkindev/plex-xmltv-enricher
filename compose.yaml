@@ -1,0 +1,25 @@
+services:
+  plex-xmltv-enricher:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: plex-xmltv-enricher:0.1.0
+    container_name: plex-xmltv-enricher
+    restart: unless-stopped
+    user: "65532:65532"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "9193:9193"
+    volumes:
+      - ./config/config.toml:/config/config.toml:ro
+      - ./state:/state
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:9193/healthz',timeout=3))['status']=='ok'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
