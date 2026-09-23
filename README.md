@@ -240,6 +240,8 @@ feeds or metadata services.
   replacing an existing production guide.
 - `0.2.1`: episodic-only provider dispatch, bounded cold-cache discovery and
   corrected TMDB locale handling for safe shadow operation.
+- `0.2.2`: exposes the current refresh's provider-series lookup count separately
+  from cumulative cache statistics for durable budget monitoring.
 
 ## License
 

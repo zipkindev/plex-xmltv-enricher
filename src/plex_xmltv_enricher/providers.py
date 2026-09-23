@@ -45,7 +45,7 @@ class JsonProvider(MetadataProvider):
         query = "" if not params else "?" + urlencode(params)
         request_headers = {
             "Accept": "application/json",
-            "User-Agent": "plex-xmltv-enricher/0.2.1",
+            "User-Agent": "plex-xmltv-enricher/0.2.2",
             **(headers or {}),
         }
         data = None

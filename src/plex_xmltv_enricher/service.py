@@ -95,6 +95,7 @@ class FeedService:
             "ambiguous": None if result is None else result.ambiguous,
             "unresolved": None if result is None else result.unresolved,
             "non_episodic": None if result is None else result.non_episodic,
+            "series_lookups": None if result is None else result.series_lookups,
         }
 
     def audit(self) -> dict[str, object]:

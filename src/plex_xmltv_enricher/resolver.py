@@ -32,6 +32,10 @@ class Resolver:
     def begin_refresh(self) -> None:
         self._series_lookups = 0
 
+    @property
+    def series_lookups(self) -> int:
+        return self._series_lookups
+
     def resolve(self, facts: ProgrammeFacts) -> Resolution:
         fingerprint = _fingerprint(facts)
         title_key = normalize(facts.title) + "\x1f" + (facts.country or self.config.resolver_country)

@@ -116,6 +116,8 @@ def test_inserted_elements_follow_xmltv_dtd_order(tmp_path: Path) -> None:
 
 def test_provider_resolution_is_append_only(tmp_path: Path) -> None:
     class StubResolver:
+        series_lookups = 0
+
         def begin_refresh(self) -> None:
             pass
 
@@ -147,6 +149,7 @@ def test_provider_resolution_is_append_only(tmp_path: Path) -> None:
 def test_unknown_classification_does_not_call_provider(tmp_path: Path) -> None:
     class StubResolver:
         calls = 0
+        series_lookups = 0
 
         def begin_refresh(self) -> None:
             pass
@@ -165,6 +168,7 @@ def test_unknown_classification_does_not_call_provider(tmp_path: Path) -> None:
     result = enrich(source, cfg, Store(tmp_path), resolver)  # type: ignore[arg-type]
     assert resolver.calls == 0
     assert result.unresolved == 1
+    assert result.series_lookups == 0
 
 
 @pytest.mark.parametrize("source", [b"", b"<tv>", b"<not-tv />", b"<tv><channel /></tv>"])

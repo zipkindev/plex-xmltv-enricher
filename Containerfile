@@ -1,6 +1,6 @@
 FROM python:3.13-slim-trixie
 
-ARG APP_VERSION=0.2.1
+ARG APP_VERSION=0.2.2
 LABEL org.opencontainers.image.title="plex-xmltv-enricher" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.description="Conservative provider-backed XMLTV resolver for Plex DVR"

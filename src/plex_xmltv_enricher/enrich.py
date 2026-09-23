@@ -31,6 +31,7 @@ class Result:
     ambiguous: int = 0
     unresolved: int = 0
     non_episodic: int = 0
+    series_lookups: int = 0
 
 
 def channel_topology(root: ET.Element) -> tuple[tuple[str, tuple[str, ...]], ...]:
@@ -286,4 +287,5 @@ def enrich(
         ambiguous=ambiguous,
         unresolved=unresolved,
         non_episodic=non_episodic,
+        series_lookups=0 if resolver is None else resolver.series_lookups,
     )

@@ -35,6 +35,7 @@ def main() -> None:
             "ambiguous": result.ambiguous,
             "unresolved": result.unresolved,
             "non_episodic": result.non_episodic,
+            "series_lookups": result.series_lookups,
             "topology_hash": result.topology_hash,
         }
         if args.command == "audit":
