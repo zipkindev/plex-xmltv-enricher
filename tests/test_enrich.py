@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -5,6 +6,7 @@ import pytest
 
 from plex_xmltv_enricher.config import Config
 from plex_xmltv_enricher.enrich import FeedError, enrich
+from plex_xmltv_enricher.models import Resolution
 from plex_xmltv_enricher.store import Store
 
 
@@ -52,14 +54,26 @@ def test_sxxexx_is_converted_to_zero_based_xmltv_ns(tmp_path: Path) -> None:
     assert node.find("episode-num[@system='xmltv_ns']").text == "2.7."  # type: ignore[union-attr]
 
 
-def test_repeat_subtitle_reuses_first_identity_date(tmp_path: Path) -> None:
+def test_sxx_exx_with_total_is_normalized_without_category_guess(tmp_path: Path) -> None:
+    source = feed(
+        programme(
+            '<episode-num system="onscreen">S10 E7/16</episode-num>',
+            title="Hubert ohne Staller",
+        ).replace("<category>Kochdokusoap</category>", "<category>Krimiserie</category>")
+    )
+    node = parsed(enrich(source, config(tmp_path), Store(tmp_path)).xml)
+    assert node.find("episode-num[@system='xmltv_ns']").text == "9.6."  # type: ignore[union-attr]
+
+
+def test_subtitle_without_episode_evidence_is_left_unchanged(tmp_path: Path) -> None:
     first = feed(programme(""))
     second = feed(programme("").replace("20260923170000", "20260924170000"))
     store = Store(tmp_path)
-    one = parsed(enrich(first, config(tmp_path), store).xml)
-    two = parsed(enrich(second, config(tmp_path), store).xml)
-    assert one.find("episode-num[@system='original-air-date']").text == "2026-09-23 17:00:00"  # type: ignore[union-attr]
-    assert two.find("episode-num[@system='original-air-date']").text == "2026-09-23 17:00:00"  # type: ignore[union-attr]
+    one = enrich(first, config(tmp_path), store)
+    two = enrich(second, config(tmp_path), store)
+    assert parsed(one.xml).find("episode-num") is None
+    assert parsed(two.xml).find("episode-num") is None
+    assert one.unresolved == 1 and two.unresolved == 1
 
 
 def test_movie_category_refuses_enrichment(tmp_path: Path) -> None:
@@ -86,6 +100,45 @@ def test_channel_topology_and_protected_fields_are_preserved(tmp_path: Path) -> 
     fields = ("title", "sub-title", "desc", "date")
     assert {f: before.findtext("programme/"+f) for f in fields} == {f: after.findtext("programme/"+f) for f in fields}
     assert before.find("programme").attrib == after.find("programme").attrib  # type: ignore[union-attr]
+
+
+def test_inserted_elements_follow_xmltv_dtd_order(tmp_path: Path) -> None:
+    source = feed(
+        programme(
+            '<date>2026</date><episode-num system="onscreen">E121</episode-num>'
+            "<video><present>yes</present></video><rating><value>12</value></rating>"
+        )
+    )
+    node = parsed(enrich(source, config(tmp_path), Store(tmp_path)).xml)
+    tags = [child.tag for child in node]
+    assert tags.index("category") < tags.index("episode-num") < tags.index("video")
+
+
+def test_provider_resolution_is_append_only(tmp_path: Path) -> None:
+    class StubResolver:
+        def resolve(self, facts: object) -> Resolution:
+            return Resolution(
+                "resolved",
+                "provider-catalog",
+                1.0,
+                "tvmaze",
+                "58601",
+                "3705532",
+                11,
+                11,
+                "Das Wiedersehen",
+                "2026-11-03",
+            )
+
+    source = feed(programme("", title="Das Sommerhaus der Stars", subtitle="")).replace(
+        b"<sub-title></sub-title>", b""
+    )
+    cfg = replace(config(tmp_path), resolver_enabled=True)
+    node = parsed(enrich(source, cfg, Store(tmp_path), StubResolver()).xml)  # type: ignore[arg-type]
+    values = {(x.get("system"), x.text) for x in node.findall("episode-num")}
+    assert ("xmltv_ns", "10.10.") in values
+    assert ("tvmaze.com", "episode/3705532") in values
+    assert node.findtext("sub-title") == "Das Wiedersehen"
 
 
 @pytest.mark.parametrize("source", [b"", b"<tv>", b"<not-tv />", b"<tv><channel /></tv>"])

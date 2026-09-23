@@ -14,7 +14,7 @@ from .service import FeedService
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("serve", "once", "doctor"))
+    parser.add_argument("command", choices=("serve", "once", "doctor", "audit"))
     parser.add_argument(
         "--config", type=Path, default=Path("/config/config.toml")
     )
@@ -23,20 +23,23 @@ def main() -> None:
     config = load_config(args.config)
     service = FeedService(config)
 
-    if args.command in {"once", "doctor"}:
+    if args.command in {"once", "doctor", "audit"}:
         result = service.refresh()
-        print(
-            json.dumps(
-                {
-                    "status": "ok",
-                    "channels": result.channels,
-                    "programmes": result.programmes,
-                    "enriched": result.enriched,
-                    "topology_hash": result.topology_hash,
-                },
-                sort_keys=True,
-            )
-        )
+        report = {
+            "status": "ok",
+            "channels": result.channels,
+            "programmes": result.programmes,
+            "enriched": result.enriched,
+            "source_normalized": result.source_normalized,
+            "provider_resolved": result.provider_resolved,
+            "ambiguous": result.ambiguous,
+            "unresolved": result.unresolved,
+            "non_episodic": result.non_episodic,
+            "topology_hash": result.topology_hash,
+        }
+        if args.command == "audit":
+            report["resolver"] = service.store.audit()
+        print(json.dumps(report, sort_keys=True))
         return
 
     service.refresh()

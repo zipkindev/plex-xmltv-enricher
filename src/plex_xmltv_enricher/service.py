@@ -10,6 +10,8 @@ import xml.etree.ElementTree as ET
 
 from .config import Config
 from .enrich import FeedError, Result, channel_topology, enrich, topology_digest
+from .providers import build_providers
+from .resolver import Resolver
 from .store import Store
 
 LOG = logging.getLogger("plex_xmltv_enricher")
@@ -19,6 +21,11 @@ class FeedService:
     def __init__(self, config: Config) -> None:
         self.config = config
         self.store = Store(config.state_dir)
+        self.resolver = Resolver(
+            config,
+            self.store,
+            build_providers(config.providers, config.timeout_seconds),
+        )
         self.lock = threading.Lock()
         self.result: Result | None = None
         self.updated_at: datetime | None = None
@@ -56,7 +63,7 @@ class FeedService:
                     raise FeedError("fallback refused before a primary topology is established")
                 if self._topology(source) != baseline:
                     raise FeedError("fallback channel topology differs from primary")
-            result = enrich(source, self.config, self.store)
+            result = enrich(source, self.config, self.store, self.resolver)
             self.store.install_output(result.xml)
             self.result = result
             self.updated_at = datetime.now(timezone.utc)
@@ -72,10 +79,27 @@ class FeedService:
             return path.read_bytes()
 
     def health(self) -> dict[str, object]:
-        now=datetime.now(timezone.utc)
-        age=None if self.updated_at is None else (now-self.updated_at).total_seconds()
-        result=self.result
-        return {"status":"ok" if result else "starting","updated_at":None if self.updated_at is None else self.updated_at.isoformat(),"age_seconds":age,"source":self.active_source,"channels":None if result is None else result.channels,"programmes":None if result is None else result.programmes,"enriched":None if result is None else result.enriched}
+        now = datetime.now(timezone.utc)
+        age = None if self.updated_at is None else (now - self.updated_at).total_seconds()
+        result = self.result
+        return {
+            "status": "ok" if result else "starting",
+            "updated_at": None if self.updated_at is None else self.updated_at.isoformat(),
+            "age_seconds": age,
+            "source": self.active_source,
+            "channels": None if result is None else result.channels,
+            "programmes": None if result is None else result.programmes,
+            "enriched": None if result is None else result.enriched,
+            "source_normalized": None if result is None else result.source_normalized,
+            "provider_resolved": None if result is None else result.provider_resolved,
+            "ambiguous": None if result is None else result.ambiguous,
+            "unresolved": None if result is None else result.unresolved,
+            "non_episodic": None if result is None else result.non_episodic,
+        }
+
+    def audit(self) -> dict[str, object]:
+        with self.lock:
+            return {"feed": self.health(), "resolver": self.store.audit()}
 
     def run_refresh_loop(self, stop: threading.Event) -> None:
         while not stop.is_set():

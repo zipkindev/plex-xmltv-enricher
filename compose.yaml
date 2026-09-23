@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Containerfile
-    image: plex-xmltv-enricher:0.1.0
+    image: plex-xmltv-enricher:0.2.0
     container_name: plex-xmltv-enricher
     restart: unless-stopped
     user: "65532:65532"
@@ -12,6 +12,10 @@ services:
     security_opt: ["no-new-privileges:true"]
     ports:
       - "9193:9193"
+    environment:
+      THETVDB_API_KEY: "${THETVDB_API_KEY:-}"
+      THETVDB_PIN: "${THETVDB_PIN:-}"
+      TMDB_READ_TOKEN: "${TMDB_READ_TOKEN:-}"
     volumes:
       - ./config/config.toml:/config/config.toml:ro
       - ./state:/state

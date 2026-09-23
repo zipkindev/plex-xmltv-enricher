@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plex-xmltv-enricher"
-version = "0.1.0"
-description = "Conservative XMLTV episode classification proxy for Plex DVR"
+version = "0.2.0"
+description = "Conservative provider-backed XMLTV episode resolver for Plex DVR"
 requires-python = ">=3.13"
 license = {text = "MIT"}
 authors = [{name = "plex-xmltv-enricher contributors"}]

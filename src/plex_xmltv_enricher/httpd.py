@@ -41,6 +41,13 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, body, "application/json")
             return
 
+        if path == "/audit.json":
+            body = json.dumps(
+                self.server.service.audit(), sort_keys=True
+            ).encode()
+            self._send(200, body, "application/json")
+            return
+
         if path == "/xmltv/plex.xml":
             try:
                 body = self.server.service.output()

@@ -23,5 +23,37 @@ series_titles = [
 ]
 movie_categories = ["Film", "Spielfilm", "Movie", "Kinofilm", "Kurzfilm"]
 
+[resolver]
+enabled = false
+language = "de"
+country = "DE"
+minimum_series_confidence = 0.92
+minimum_episode_confidence = 0.95
+ambiguity_margin = 0.08
+catalog_ttl_hours = 168
+negative_ttl_hours = 24
+
+# Credentials are read from these environment variables at runtime. Never put
+# API keys or subscriber PINs in this file.
+[providers.thetvdb]
+enabled = false
+api_key_env = "THETVDB_API_KEY"
+pin_env = "THETVDB_PIN"
+
+[providers.tmdb]
+enabled = false
+api_key_env = "TMDB_READ_TOKEN"
+
+[providers.tvmaze]
+enabled = true
+
+# Overrides are durable identity declarations, not episode guesses. The
+# numbering model controls how a source value such as E121 may be compared to
+# provider episodes: catalog, year, or absolute.
+[series_overrides."Das perfekte Dinner"]
+provider = "thetvdb"
+series_id = "266543"
+numbering = "year"
+
 [test_tuner]
 enabled = false
