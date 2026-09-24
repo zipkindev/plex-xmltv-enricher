@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Containerfile
-    image: plex-xmltv-enricher:0.3.0
+    image: plex-xmltv-enricher:0.4.0
     container_name: plex-xmltv-enricher
     restart: unless-stopped
     user: "65532:65532"

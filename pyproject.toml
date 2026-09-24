@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plex-xmltv-enricher"
-version = "0.3.0"
+version = "0.4.0"
 description = "Conservative provider-backed XMLTV episode resolver for Plex DVR"
 requires-python = ">=3.13"
 license = "0BSD"

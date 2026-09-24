@@ -14,6 +14,7 @@ class ProgrammeFacts:
     production_year: int | None
     airing_date: str
     onscreen_number: str
+    original_air_date: str = ""
 
 
 @dataclass(frozen=True)

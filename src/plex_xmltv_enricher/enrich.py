@@ -93,6 +93,14 @@ def _airing_datetime(programme: ET.Element) -> str:
     return datetime.strptime(match.group(1), "%Y%m%d%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _original_air_date(programme: ET.Element) -> str:
+    node = programme.find("previously-shown")
+    match = None if node is None else re.match(r"^(\d{8})", node.get("start", ""))
+    if not match:
+        return ""
+    return datetime.strptime(match.group(1), "%Y%m%d").strftime("%Y-%m-%d")
+
+
 def _categories(programme: ET.Element) -> set[str]:
     return {
         (node.text or "").strip().casefold()
@@ -160,6 +168,7 @@ def _facts(
         production_year=production_year,
         airing_date=_airing_date(programme),
         onscreen_number=systems.get("onscreen", ""),
+        original_air_date=_original_air_date(programme),
     )
 
 

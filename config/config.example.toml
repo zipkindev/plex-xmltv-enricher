@@ -15,7 +15,10 @@ state_dir = "/state"
 [enrichment]
 series_categories = [
   "Series", "Serie", "Kochdokusoap", "Dokusoap", "Doku-Soap",
-  "Comedyserie", "Krimiserie", "Soap", "Telenovela"
+  "Comedyserie", "Krimiserie", "Soap", "Telenovela", "Dokureihe",
+  "Dokumentationsreihe", "Daily Soap", "Gerichtsshow", "Gerichtssoap",
+  "Krempelsoap", "Realityserie", "Realityshow", "Dating-Doku",
+  "True-Crime-Dokureihe"
 ]
 series_titles = [
   "Das perfekte Dinner", "First Dates - Ein Tisch für zwei",
@@ -24,7 +27,7 @@ series_titles = [
 movie_categories = ["Film", "Spielfilm", "Movie", "Kinofilm", "Kurzfilm"]
 
 [resolver]
-enabled = false
+enabled = true
 language = "de"
 country = "DE"
 minimum_series_confidence = 0.92
@@ -32,12 +35,12 @@ minimum_episode_confidence = 0.95
 ambiguity_margin = 0.08
 catalog_ttl_hours = 168
 negative_ttl_hours = 24
-max_series_lookups_per_refresh = 10
+max_series_lookups_per_refresh = 50
 
 # Credentials are read from these environment variables at runtime. Never put
 # API keys or subscriber PINs in this file.
 [providers.thetvdb]
-enabled = false
+enabled = true
 api_key_env = "THETVDB_API_KEY"
 pin_env = "THETVDB_PIN"
 
@@ -52,8 +55,8 @@ enabled = true
 # numbering model controls how a source value such as E121 may be compared to
 # provider episodes: catalog, year, or absolute.
 [series_overrides."Das perfekte Dinner"]
-provider = "tmdb"
-series_id = "127163"
+provider = "thetvdb"
+series_id = "266543"
 numbering = "catalog"
 
 [test_tuner]

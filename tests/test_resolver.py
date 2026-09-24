@@ -101,7 +101,7 @@ def test_override_and_year_numbering_resolve_exact_episode(tmp_path: Path) -> No
     assert provider.searches == 0 and provider.catalogs == 1
 
 
-def test_ambiguous_episode_is_not_enriched(tmp_path: Path) -> None:
+def test_duplicate_episode_evidence_is_not_enriched(tmp_path: Path) -> None:
     class Ambiguous(FakeProvider):
         def episodes(self, series_id: str, language: str) -> list[EpisodeCandidate]:
             return [
@@ -116,7 +116,7 @@ def test_ambiguous_episode_is_not_enriched(tmp_path: Path) -> None:
     result = Resolver(cfg(tmp_path, True), Store(tmp_path), [Ambiguous()]).resolve(
         facts("Same", "")
     )
-    assert result.status == "ambiguous"
+    assert result.status == "unresolved"
 
 
 def test_series_search_and_catalog_are_reused_from_sqlite(tmp_path: Path) -> None:
@@ -204,3 +204,80 @@ def test_series_cache_is_scoped_by_country(tmp_path: Path) -> None:
     assert resolver.resolve(german).series_id == "series-DE"
     assert resolver.resolve(american).series_id == "series-US"
     assert provider.searches == 2
+
+
+def test_provider_priority_does_not_treat_duplicate_catalog_hit_as_tie(
+    tmp_path: Path,
+) -> None:
+    class Secondary(FakeProvider):
+        name = "tmdb"
+
+        def search_series(
+            self, title: str, language: str, country: str
+        ) -> list[SeriesCandidate]:
+            self.searches += 1
+            return [
+                SeriesCandidate("tmdb", "127163", title, language="de", country="DE")
+            ]
+
+        def episodes(self, series_id: str, language: str) -> list[EpisodeCandidate]:
+            raise AssertionError("lower-priority catalog must not be selected")
+
+    primary = FakeProvider()
+    secondary = Secondary()
+    result = Resolver(cfg(tmp_path), Store(tmp_path), [primary, secondary]).resolve(facts())
+    assert result.status == "resolved"
+    assert result.provider == "thetvdb"
+    assert secondary.searches == 0
+
+
+def test_original_air_date_is_preferred_for_rerun_matching(tmp_path: Path) -> None:
+    original = replace(facts("", ""), airing_date="2026-09-23", original_air_date="2024-02-21")
+
+    class Rerun(FakeProvider):
+        def episodes(self, series_id: str, language: str) -> list[EpisodeCandidate]:
+            return [
+                EpisodeCandidate(
+                    "thetvdb", "old", series_id, "", 2024, 41, airdate="2024-02-21"
+                ),
+                EpisodeCandidate(
+                    "thetvdb", "new", series_id, "", 2026, 121, airdate="2026-09-23"
+                ),
+            ]
+
+    result = Resolver(cfg(tmp_path, True), Store(tmp_path), [Rerun()]).resolve(original)
+    assert result.status == "resolved"
+    assert (result.season, result.episode, result.episode_id) == (2024, 41, "old")
+
+
+def test_schedule_date_alone_does_not_misidentify_rerun(tmp_path: Path) -> None:
+    rerun = replace(
+        facts("A completely different rerun", ""),
+        airing_date="2026-09-23",
+        original_air_date="",
+    )
+    result = Resolver(cfg(tmp_path, True), Store(tmp_path), [FakeProvider()]).resolve(rerun)
+    assert result.status == "unresolved"
+    assert result.reason == "episode_below_confidence"
+
+
+def test_discovered_series_rejects_provider_number_that_conflicts_with_source(
+    tmp_path: Path,
+) -> None:
+    class Offset(FakeProvider):
+        def episodes(self, series_id: str, language: str) -> list[EpisodeCandidate]:
+            return [
+                EpisodeCandidate(
+                    "thetvdb",
+                    "offset",
+                    series_id,
+                    "Tag 3: Noah, Berlin",
+                    2026,
+                    120,
+                    airdate="2026-09-23",
+                )
+            ]
+
+    result = Resolver(cfg(tmp_path), Store(tmp_path), [Offset()]).resolve(facts())
+    assert result.status == "unresolved"
+    assert result.reason == "episode_conflicts_with_source_number"

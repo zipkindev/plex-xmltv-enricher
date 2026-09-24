@@ -38,7 +38,14 @@ class Resolver:
 
     def resolve(self, facts: ProgrammeFacts) -> Resolution:
         fingerprint = _fingerprint(facts)
-        title_key = normalize(facts.title) + "\x1f" + (facts.country or self.config.resolver_country)
+        # Version the identity namespace so corrected provider semantics are not
+        # hidden by a fresh negative cache or a lower-priority v0.3 mapping.
+        title_key = (
+            "v04\x1f"
+            + normalize(facts.title)
+            + "\x1f"
+            + (facts.country or self.config.resolver_country)
+        )
         try:
             mapping = self._series_mapping(title_key, facts)
         except LookupBudgetExceeded:
@@ -93,29 +100,46 @@ class Resolver:
                 raise LookupBudgetExceeded
             self._series_lookups += 1
         candidates = self._series_candidates(title_key, facts)
-        ranked = sorted(
-            ((_series_score(facts, candidate, self.config), candidate) for candidate in candidates),
-            key=lambda item: item[0],
-            reverse=True,
-        )
-        if not ranked or ranked[0][0] < self.config.minimum_series_confidence:
+        selected = self._select_series_candidate(facts, candidates)
+        if selected is None:
             return None
-        runner_up = ranked[1][0] if len(ranked) > 1 else 0.0
-        if ranked[0][0] - runner_up < self.config.ambiguity_margin:
-            return None
-        confidence, candidate = ranked[0]
+        confidence, candidate = selected
         self.store.save_series_mapping(
             title_key,
             candidate.provider,
             candidate.series_id,
             candidate.name,
-            "catalog",
+            "source",
             confidence,
             "provider-search",
         )
         discovered_mapping = self.store.series_mapping(title_key)
         self._mapping_memory[title_key] = discovered_mapping
         return discovered_mapping
+
+    def _select_series_candidate(
+        self, facts: ProgrammeFacts, candidates: list[SeriesCandidate]
+    ) -> tuple[float, SeriesCandidate] | None:
+        # Providers are authoritative in configured order. Comparing identical
+        # hits from different catalogs as runners-up made exact matches appear
+        # ambiguous in v0.3.
+        for provider_name in self.providers:
+            ranked = sorted(
+                (
+                    (_series_score(facts, candidate, self.config), candidate)
+                    for candidate in candidates
+                    if candidate.provider == provider_name
+                ),
+                key=lambda item: item[0],
+                reverse=True,
+            )
+            if not ranked or ranked[0][0] < self.config.minimum_series_confidence:
+                continue
+            runner_up = ranked[1][0] if len(ranked) > 1 else 0.0
+            if ranked[0][0] - runner_up < self.config.ambiguity_margin:
+                continue
+            return ranked[0]
+        return None
 
     def _override_mapping(
         self, title_key: str, title: str, override: SeriesOverride
@@ -153,6 +177,8 @@ class Resolver:
                     )
                 )
                 successful += 1
+                if self._select_series_candidate(facts, candidates) is not None:
+                    break
             except ProviderError:
                 continue
         if successful:
@@ -187,14 +213,27 @@ class Resolver:
     ) -> Resolution:
         provider = str(mapping["provider"])
         series_id = str(mapping["series_id"])
+        numbering = str(mapping["numbering"])
         if not episodes:
             return Resolution(
                 "unresolved", "episode_catalog_empty", provider=provider, series_id=series_id
             )
-        scored = [
-            (_episode_score(facts, episode, str(mapping["numbering"])), episode)
-            for episode in episodes
-        ]
+        bare_match = re.fullmatch(r"E(\d{1,6})", facts.onscreen_number, re.IGNORECASE)
+        if numbering == "source" and bare_match:
+            source_number = int(bare_match.group(1))
+            episodes = [
+                episode
+                for episode in episodes
+                if episode.number == source_number or episode.absolute_number == source_number
+            ]
+            if not episodes:
+                return Resolution(
+                    "unresolved",
+                    "episode_conflicts_with_source_number",
+                    provider=provider,
+                    series_id=series_id,
+                )
+        scored = [(_episode_score(facts, episode, numbering), episode) for episode in episodes]
         subtitle_key = normalize(facts.subtitle)
         exact_subtitles = [
             episode
@@ -202,7 +241,9 @@ class Resolver:
             if subtitle_key and normalize(episode.name) == subtitle_key
         ]
         exact_dates = [
-            episode for episode in episodes if episode.airdate == facts.airing_date
+            episode
+            for episode in episodes
+            if facts.original_air_date and episode.airdate == facts.original_air_date
         ]
         if len(exact_subtitles) == 1:
             scored = [
@@ -302,7 +343,7 @@ def _episode_score(facts: ProgrammeFacts, episode: EpisodeCandidate, numbering: 
             score += 0.72
         else:
             score += 0.45 * SequenceMatcher(None, subtitle, episode_name).ratio()
-    if episode.airdate and episode.airdate == facts.airing_date:
+    if facts.original_air_date and episode.airdate == facts.original_air_date:
         score += 0.35
     if facts.production_year and episode.airdate and episode.airdate[:4].isdigit():
         if int(episode.airdate[:4]) == facts.production_year:
@@ -324,6 +365,8 @@ def _episode_score(facts: ProgrammeFacts, episode: EpisodeCandidate, numbering: 
         ):
             score += 1.0
         elif numbering == "absolute" and number == episode.absolute_number:
+            score += 1.0
+        elif numbering == "source" and number in {episode.number, episode.absolute_number}:
             score += 1.0
     return min(score, 1.0)
 

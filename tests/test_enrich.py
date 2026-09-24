@@ -201,6 +201,26 @@ def test_configured_series_uses_stable_identity_after_provider_miss(tmp_path: Pa
     assert second_node is not None and second_node.text == first_node.text
 
 
+def test_previously_shown_date_is_passed_to_resolver(tmp_path: Path) -> None:
+    class StubResolver:
+        calls: list[object] = []
+        series_lookups = 0
+
+        def begin_refresh(self) -> None:
+            pass
+
+        def resolve(self, facts: object) -> Resolution:
+            self.calls.append(facts)
+            return Resolution("unresolved", "episode_below_confidence")
+
+    source = feed(programme('<previously-shown start="20240221000000 +0100"/>'))
+    cfg = replace(config(tmp_path), resolver_enabled=True)
+    resolver = StubResolver()
+    enrich(source, cfg, Store(tmp_path), resolver)  # type: ignore[arg-type]
+    assert len(resolver.calls) == 1
+    assert getattr(resolver.calls[0], "original_air_date") == "2024-02-21"
+
+
 @pytest.mark.parametrize("source", [b"", b"<tv>", b"<not-tv />", b"<tv><channel /></tv>"])
 def test_malformed_or_incomplete_feed_is_rejected(tmp_path: Path, source: bytes) -> None:
     with pytest.raises(FeedError):

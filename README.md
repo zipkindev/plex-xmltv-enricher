@@ -51,8 +51,10 @@ Programs are handled in this order:
    `2.7.` without a network lookup.
 3. The resolver maps a show to a stable provider ID using normalized title,
    aliases, country, language and network.
-4. An episode is selected using catalog numbering, exact unique subtitle,
-   exact unique airdate, or a configured `year`/`absolute` numbering model.
+4. An episode is selected using compatible source numbering, an exact unique
+   subtitle, an explicit `previously-shown` original-air date, or a reviewed
+   `catalog`/`year`/`absolute` override. A schedule date alone never identifies
+   a rerun.
 5. Minimum confidence and runner-up margin gates must both pass.
 6. After a provider miss, an explicit bare episode plus production year is
    normalized using the legacy year-season convention. If only a subtitle is
@@ -70,7 +72,7 @@ or generated XMLTV.
 
 | Provider | Intended role | Credential |
 | --- | --- | --- |
-| TheTVDB | Primary optional catalog for German and international television | Project API key and optional subscriber PIN |
+| TheTVDB | Primary catalog for German and international television | Project API key and optional subscriber PIN |
 | TMDB | Optional secondary catalog and cross-check | API read token |
 | TVmaze | Free zero-credential fallback | None |
 
@@ -86,6 +88,13 @@ after the configured cache TTL, including negative-cache entries. Episode
 catalogs use stale data if a refresh fails, while invalid source XML never
 replaces the last-known-good guide. Provider requests retry rate limits and
 transient server/network failures with bounded backoff.
+
+Enabled providers are tried in configuration order: TheTVDB, then TMDB, then
+TVmaze. The first unambiguous high-confidence series match wins. Duplicate
+records for the same show in multiple catalogs therefore do not create a false
+tie, and fallback providers are not queried unnecessarily. TheTVDB requests
+automatically translate common two-letter locale values such as `de`/`DE` to
+the API's required `deu` identifiers.
 
 SQLite records:
 
@@ -122,7 +131,7 @@ minimum_episode_confidence = 0.95
 ambiguity_margin = 0.08
 catalog_ttl_hours = 168
 negative_ttl_hours = 24
-max_series_lookups_per_refresh = 10
+max_series_lookups_per_refresh = 50
 
 [providers.thetvdb]
 enabled = true
@@ -130,7 +139,7 @@ api_key_env = "THETVDB_API_KEY"
 pin_env = "THETVDB_PIN"
 
 [providers.tmdb]
-enabled = false
+enabled = true
 api_key_env = "TMDB_READ_TOKEN"
 
 [providers.tvmaze]
@@ -142,17 +151,23 @@ hard-code individual episodes:
 
 ```toml
 [series_overrides."Das perfekte Dinner"]
-provider = "tmdb"
-series_id = "127163"
+provider = "thetvdb"
+series_id = "266543"
 numbering = "catalog"
 ```
 
 Supported numbering models are:
 
-- `catalog`: match catalog season/episode, subtitle or airdate;
+- `catalog`: trust a reviewed provider catalog identity even when its canonical
+  numbering differs from a source's bare `E###` value;
 - `year`: compare a source `E121` with catalog `S2026E121` when the source year
   is 2026;
 - `absolute`: compare a source number with a provider absolute episode number.
+
+Automatically discovered series use a stricter source-compatible model: when
+the source supplies `E###`, a provider episode must carry the same regular or
+absolute number. Otherwise the provider match is refused and the conservative
+source/year fallback is used.
 
 ## Docker Compose
 
@@ -223,6 +238,27 @@ Plex parser tests.
 
 ## Production evidence
 
+Version 0.4.0 was promoted on 2026-09-24 after exact-input offline comparison,
+a clean TrueNAS shadow, and a guarded in-place Plex DVR reload. The rolling
+final snapshot retained all 160 ordered channels and 10,017 programmes with no
+protected-field changes or removed source identities.
+
+- 614 programmes gained episodic identity;
+- 135 were provider-resolved, 290 used compatible source numbering, and 189
+  used stable title/subtitle identity;
+- 23 sampled GZSZ and Alles was zählt records retained exact source `E###`
+  agreement;
+- Plex imported current `Das perfekte Dinner` as canonical Season 2026
+  Episodes 142–143 and current First Dates entries as episodes;
+- DVR 7, both independent one-stream tuner devices and all 160 mappings per
+  device were preserved.
+
+The release image ID is
+`sha256:6d93c3c44e7cacd837a14d03f7c628a21eda8a8b12a0c8ee1354046768784c3f`.
+The production deployment did not proxy or open a media stream.
+
+### Previous v0.3 evidence
+
 Version 0.3.0 was promoted through an isolated shadow and guarded in-place Plex
 DVR deployment on 2026-09-23. The live seven-day snapshot retained all 160
 ordered channels and all 12,253 source programmes with zero changes to protected
@@ -272,6 +308,9 @@ feeds or metadata services.
   from cumulative cache statistics for durable budget monitoring.
 - `0.3.0`: canonical-first resolution with a measured stable-identity fallback,
   punctuation-normalized configured titles, and bounded provider retry/backoff.
+- `0.4.0`: corrected TheTVDB `deu` locale handling, ordered provider fallback,
+  source-number conflict protection, original-air-date-aware rerun matching,
+  and broader configurable German episodic categories.
 
 ## License
 

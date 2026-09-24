@@ -47,7 +47,7 @@ class JsonProvider(MetadataProvider):
         query = "" if not params else "?" + urlencode(params)
         request_headers = {
             "Accept": "application/json",
-            "User-Agent": "plex-xmltv-enricher/0.3.0",
+            "User-Agent": "plex-xmltv-enricher/0.4.0",
             **(headers or {}),
         }
         data = None
@@ -226,6 +226,8 @@ class TheTvdbProvider(JsonProvider):
         return {"Authorization": f"Bearer {self._token}"}
 
     def search_series(self, title: str, language: str, country: str) -> list[SeriesCandidate]:
+        language = _thetvdb_language(language)
+        country = _thetvdb_country(country)
         data = self._json(
             "/search",
             params={"query": title, "type": "series", "country": country, "language": language},
@@ -250,6 +252,7 @@ class TheTvdbProvider(JsonProvider):
         return [x for x in result if x.series_id and x.name]
 
     def episodes(self, series_id: str, language: str) -> list[EpisodeCandidate]:
+        language = _thetvdb_language(language)
         result: list[EpisodeCandidate] = []
         page = 0
         while page < 100:
@@ -285,6 +288,32 @@ def _integer(value: object) -> int | None:
         return None if value is None else int(str(value))
     except (TypeError, ValueError):
         return None
+
+
+def _thetvdb_language(value: str) -> str:
+    normalized = value.strip().casefold().replace("_", "-").split("-", 1)[0]
+    return {
+        "de": "deu",
+        "deu": "deu",
+        "ger": "deu",
+        "en": "eng",
+        "eng": "eng",
+    }.get(normalized, normalized)
+
+
+def _thetvdb_country(value: str) -> str:
+    normalized = value.strip().casefold()
+    return {
+        "de": "deu",
+        "deu": "deu",
+        "germany": "deu",
+        "us": "usa",
+        "usa": "usa",
+        "au": "aus",
+        "aus": "aus",
+        "ca": "can",
+        "can": "can",
+    }.get(normalized, normalized)
 
 
 def build_providers(configs: tuple[ProviderConfig, ...], timeout: float) -> list[MetadataProvider]:

@@ -32,7 +32,7 @@ class FeedService:
         self.active_source: str | None = None
 
     def _fetch(self, url: str) -> bytes:
-        request = Request(url, headers={"User-Agent": "plex-xmltv-enricher/0.1"})
+        request = Request(url, headers={"User-Agent": "plex-xmltv-enricher/0.4.0"})
         with urlopen(request, timeout=self.config.timeout_seconds) as response:
             content_type = response.headers.get_content_type()
             if content_type not in {"application/xml", "text/xml", "application/octet-stream"}:

@@ -73,7 +73,7 @@ class Handler(BaseHTTPRequestHandler):
                     "ModelNumber": "metadata-only",
                     "FirmwareName": "metadata-only",
                     "TunerCount": 1,
-                    "FirmwareVersion": "0.1.0",
+                    "FirmwareVersion": "0.4.0",
                     "DeviceID": "plexxmltvenrichertest01",
                     "DeviceAuth": "",
                     "BaseURL": f"http://{host}/test-tuner",
